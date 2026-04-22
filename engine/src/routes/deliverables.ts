@@ -63,7 +63,7 @@ deliverablesRoute.get("/deliverables/:slug", async (c) => {
     const deliverable = { id: match.id, ...match.fields };
     const allGates = await gristGetAll("/tables/Gates/records");
     const gates = (allGates.records ?? [])
-      .filter((r: any) => r.fields?.deliverable_ref === match.id)
+      .filter((r: any) => r.fields?.deliverable_slug === slug)
       .map((r: any) => ({ id: r.id, ...r.fields }));
     return c.json({ deliverable, gates });
   } catch (e) {

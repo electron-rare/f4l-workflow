@@ -83,28 +83,36 @@ gristWebhook.post("/webhooks/grist", async (c) => {
     }
   }
 
-  // If life-core is wired, trigger the spec agent and advance to spec.
-  if (lc && deliverable_id && g && intake.deliverable_type === "A") {
-    try {
-      const result = await lc.runAgent("spec", {
-        intake: {
-          title: intake.title,
-          normalized_payload: intake.normalized_payload,
-        },
-        compliance_profile: "prototype",
-      });
-      counters.agentInvocations.inc({
-        role: "spec",
-        status: result.result.ok ? "pass" : "fail",
-      });
-      if (result.result.ok) {
-        const next = transition("intake", { kind: "SpecDraftCompleted" });
-        await g.updateDeliverableState(deliverable_id, next);
-        counters.gateTransitions.inc({ gate: "G-spec", verdict: "pending" });
+  // Auto-advance from intake to spec whenever a type-A deliverable is created,
+  // even if life-core isn't wired. If life-core is available, the spec agent
+  // will have written a draft spec in git; otherwise the draft step is left
+  // for the human or a future re-dispatch.
+  if (deliverable_id && g && intake.deliverable_type === "A") {
+    if (lc) {
+      try {
+        const result = await lc.runAgent("spec", {
+          intake: {
+            title: intake.title,
+            normalized_payload: intake.normalized_payload,
+          },
+          compliance_profile: "prototype",
+        });
+        counters.agentInvocations.inc({
+          role: "spec",
+          status: result.result.ok ? "pass" : "fail",
+        });
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("life-core spec agent failed:", (e as Error).message);
       }
+    }
+    try {
+      const next = transition("intake", { kind: "SpecDraftCompleted" });
+      await g.updateDeliverableState(deliverable_id, next);
+      counters.gateTransitions.inc({ gate: "G-spec", verdict: "pending" });
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.error("life-core spec agent failed:", (e as Error).message);
+      console.error("state update to spec failed:", (e as Error).message);
     }
   }
 
