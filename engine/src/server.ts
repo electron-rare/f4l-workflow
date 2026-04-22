@@ -3,6 +3,7 @@ import { serve } from "@hono/node-server";
 import { gristWebhook } from "./webhooks/grist.js";
 import { forgejoWebhook } from "./webhooks/forgejo.js";
 import { gateRoute } from "./routes/gate.js";
+import { deliverablesRoute } from "./routes/deliverables.js";
 import { registry } from "./metrics.js";
 
 const app = new Hono();
@@ -17,6 +18,7 @@ app.get("/metrics", async (c) => {
 app.route("/", gristWebhook);
 app.route("/", forgejoWebhook);
 app.route("/", gateRoute);
+app.route("/", deliverablesRoute);
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT ?? 9100);
