@@ -1,0 +1,40 @@
+# f4l-workflow/workflow.yaml
+version: 1
+
+deliverable_types:
+  A:
+    name: "Hardware evidence pack"
+    gates: [G-spec, G-impl, G-ship]
+    states: [intake, spec, impl, ship, done, aborted, blocked-by-fix]
+  B:
+    name: "Product increment"
+    gates: [G-ready, G-release]
+    states: [ready, release, done, aborted]
+
+failure_policies:
+  G-spec:
+    mode: auto-revert
+    max_retries: 3
+  G-impl:
+    mode: block-notify
+    categories:
+      compliance:
+        mode: fork
+  G-ship:
+    mode: hard-fail
+    requires: postmortem
+  G-ready:
+    mode: block-notify
+  G-release:
+    mode: hard-fail
+    requires: postmortem
+
+compliance_profiles:
+  - prototype
+  - iot_wifi_eu
+
+intake_sources:
+  - grist
+  - forgejo
+  - mascarade
+  # email deferred to post-MVP
