@@ -1,0 +1,33 @@
+name: E2E-2 G-spec retries then blocks
+on: workflow_dispatch
+
+# Scenario: spec agent returns malformed (no RFC2119 markers) 3 times.
+# The engine should auto-retry up to 3 attempts, then block the deliverable
+# and notify human. Final state must stay `intake` with gate[G-spec] marked fail.
+
+jobs:
+  e2e-spec-fail:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    env:
+      TITLE: "e2e-spec-fail"
+    steps:
+      - name: Seed + force agent spec to fail
+        env:
+          SECRET: ${{ secrets.F4L_WEBHOOK_SECRET }}
+        run: |
+          # Pre-condition: life-core must be in "force fail" mode for this test.
+          # For MVP, this relies on a feature flag life-core/spec-agent respects:
+          # F4L_TEST_FORCE_FAIL=1. When the flag is set the spec agent returns
+          # without RFC2119 markers regardless of LLM output.
+          curl -sf -X POST https://engine.saillant.cc/webhooks/grist \
+            -H "X-Grist-Secret: $SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"records\":[{\"fields\":{\"source\":\"grist\",\"title\":\"$TITLE\",\"deliverable_type\":\"A\"}}]}"
+      - name: Verify state stays blocked after 4 attempts (~5 min)
+        run: |
+          sleep 300
+          state=$(curl -sf -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+                   "https://engine.saillant.cc/deliverables" | \
+                   jq -r ".[] | select(.title==\"$TITLE\") | .current_state" | head -1)
+          [ "$state" = "intake" ] || exit 1

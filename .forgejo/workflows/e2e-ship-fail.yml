@@ -1,0 +1,51 @@
+name: E2E-5 G-ship hard-fail
+on: workflow_dispatch
+
+# Scenario: deliverable reaches ship, then G-ship is advanced with verdict=fail.
+# Engine should transition state to `aborted` and require a postmortem file
+# before any new intake with the same slug is accepted.
+
+jobs:
+  e2e-ship-fail:
+    runs-on: self-hosted
+    timeout-minutes: 10
+    env:
+      TITLE: "e2e-ship-fail"
+    steps:
+      - name: Seed + fast-forward to ship
+        env:
+          SECRET: ${{ secrets.F4L_WEBHOOK_SECRET }}
+        run: |
+          curl -sf -X POST https://engine.saillant.cc/webhooks/grist \
+            -H "X-Grist-Secret: $SECRET" -H "Content-Type: application/json" \
+            -d "{\"records\":[{\"fields\":{\"source\":\"grist\",\"title\":\"$TITLE\",\"deliverable_type\":\"A\"}}]}"
+          sleep 20
+          slug=$(curl -sf -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+                  "https://engine.saillant.cc/deliverables" | \
+                  jq -r ".[] | select(.title==\"$TITLE\") | .slug" | head -1)
+          echo "$slug" > /tmp/slug
+          for gate in G-spec; do
+            curl -sf -X POST https://engine.saillant.cc/gate/advance \
+              -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"deliverable_id\":\"$slug\",\"gate\":\"$gate\",\"verdict\":\"pass\"}"
+          done
+          curl -sf -X POST https://engine.saillant.cc/webhooks/forgejo \
+            -H "X-Forgejo-Signature: ${{ secrets.F4L_WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"deliverable_id\":\"$slug\",\"run_id\":\"${{ github.run_id }}\",\"status\":\"success\"}"
+
+      - name: Advance G-ship with verdict=fail
+        run: |
+          slug=$(cat /tmp/slug)
+          curl -sf -X POST https://engine.saillant.cc/gate/advance \
+            -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"deliverable_id\":\"$slug\",\"gate\":\"G-ship\",\"verdict\":\"fail\"}"
+
+      - name: Assert state is aborted
+        run: |
+          state=$(curl -sf -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+                   "https://engine.saillant.cc/deliverables" | \
+                   jq -r ".[] | select(.title==\"$TITLE\") | .current_state" | head -1)
+          [ "$state" = "aborted" ] || exit 1

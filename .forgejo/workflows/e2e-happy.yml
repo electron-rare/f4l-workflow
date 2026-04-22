@@ -1,0 +1,67 @@
+name: E2E-1 Happy path (type A)
+on: workflow_dispatch
+
+jobs:
+  e2e-happy:
+    runs-on: self-hosted
+    timeout-minutes: 30
+    steps:
+      - name: Create synthetic intake
+        env:
+          SECRET: ${{ secrets.F4L_WEBHOOK_SECRET }}
+        run: |
+          resp=$(curl -sf -X POST https://engine.saillant.cc/webhooks/grist \
+            -H "X-Grist-Secret: $SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"records":[{"fields":{"source":"grist","title":"e2e-happy","deliverable_type":"A","details":"auto"}}]}')
+          echo "$resp"
+          echo "$resp" | jq -r '.intake_id' > /tmp/intake_id
+
+      - name: Wait for deliverable to reach state=spec
+        run: |
+          for i in $(seq 1 30); do
+            s=$(curl -sf -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+                "https://engine.saillant.cc/deliverables" | \
+                jq -r '.[] | select(.title=="e2e-happy") | .current_state' | head -1)
+            echo "[$i/30] current_state=$s"
+            [ "$s" = "spec" ] && break
+            sleep 10
+          done
+
+      - name: Advance G-spec pass
+        run: |
+          slug=$(curl -sf -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+                  "https://engine.saillant.cc/deliverables" | \
+                  jq -r '.[] | select(.title=="e2e-happy") | .slug' | head -1)
+          curl -sf -X POST https://engine.saillant.cc/gate/advance \
+            -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"deliverable_id\":\"$slug\",\"gate\":\"G-spec\",\"verdict\":\"pass\"}"
+
+      - name: Simulate G-impl pass (via forgejo webhook)
+        run: |
+          slug=$(curl -sf -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+                  "https://engine.saillant.cc/deliverables" | \
+                  jq -r '.[] | select(.title=="e2e-happy") | .slug' | head -1)
+          curl -sf -X POST https://engine.saillant.cc/webhooks/forgejo \
+            -H "X-Forgejo-Signature: ${{ secrets.F4L_WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"deliverable_id\":\"$slug\",\"run_id\":\"${{ github.run_id }}\",\"status\":\"success\"}"
+
+      - name: Advance G-ship pass
+        run: |
+          slug=$(curl -sf -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+                  "https://engine.saillant.cc/deliverables" | \
+                  jq -r '.[] | select(.title=="e2e-happy") | .slug' | head -1)
+          curl -sf -X POST https://engine.saillant.cc/gate/advance \
+            -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"deliverable_id\":\"$slug\",\"gate\":\"G-ship\",\"verdict\":\"pass\"}"
+
+      - name: Assert final state is done or ship
+        run: |
+          state=$(curl -sf -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+                   "https://engine.saillant.cc/deliverables" | \
+                   jq -r '.[] | select(.title=="e2e-happy") | .current_state' | head -1)
+          echo "final state: $state"
+          [ "$state" = "done" ] || [ "$state" = "ship" ] || exit 1

@@ -1,0 +1,45 @@
+name: E2E-3 G-impl block on CI red
+on: workflow_dispatch
+
+# Scenario: deliverable reaches impl, simulate Forgejo CI webhook with
+# status=failure. Engine should transition state to stay in `impl` with
+# gate[G-impl] marked fail + reasons captured. Operator waits for human.
+
+jobs:
+  e2e-impl-fail:
+    runs-on: self-hosted
+    timeout-minutes: 20
+    env:
+      TITLE: "e2e-impl-fail"
+    steps:
+      - name: Seed + advance to impl
+        env:
+          SECRET: ${{ secrets.F4L_WEBHOOK_SECRET }}
+        run: |
+          curl -sf -X POST https://engine.saillant.cc/webhooks/grist \
+            -H "X-Grist-Secret: $SECRET" -H "Content-Type: application/json" \
+            -d "{\"records\":[{\"fields\":{\"source\":\"grist\",\"title\":\"$TITLE\",\"deliverable_type\":\"A\"}}]}"
+          sleep 30
+          slug=$(curl -sf -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+                  "https://engine.saillant.cc/deliverables" | \
+                  jq -r ".[] | select(.title==\"$TITLE\") | .slug" | head -1)
+          curl -sf -X POST https://engine.saillant.cc/gate/advance \
+            -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"deliverable_id\":\"$slug\",\"gate\":\"G-spec\",\"verdict\":\"pass\"}"
+          echo "$slug" > /tmp/slug
+
+      - name: Inject CI failure via forgejo webhook
+        run: |
+          slug=$(cat /tmp/slug)
+          curl -sf -X POST https://engine.saillant.cc/webhooks/forgejo \
+            -H "X-Forgejo-Signature: ${{ secrets.F4L_WEBHOOK_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"deliverable_id\":\"$slug\",\"run_id\":\"${{ github.run_id }}\",\"status\":\"failure\"}"
+
+      - name: Assert state stays impl (blocked)
+        run: |
+          state=$(curl -sf -H "Authorization: Bearer ${{ secrets.F4L_BEARER_TOKEN }}" \
+                   "https://engine.saillant.cc/deliverables" | \
+                   jq -r ".[] | select(.title==\"$TITLE\") | .current_state" | head -1)
+          [ "$state" = "impl" ] || exit 1
