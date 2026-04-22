@@ -1,0 +1,76 @@
+name: CI (Embedded / ESP-IDF)
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - 'src/**'
+      - 'main/**'
+      - 'components/**'
+      - 'CMakeLists.txt'
+      - 'sdkconfig*'
+      - 'partitions*.csv'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-embedded-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-firmware:
+    name: Build firmware (${{ matrix.target }} / IDF ${{ matrix.idf-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [esp32, esp32s3]
+        idf-version: [release-v5.5]
+    container:
+      image: espressif/idf:${{ matrix.idf-version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Cache IDF components
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.espressif/dist
+            ~/.cache/pip
+            build/${{ matrix.target }}/dependencies.lock
+          key: idf-${{ matrix.idf-version }}-${{ matrix.target }}-${{ hashFiles('**/CMakeLists.txt', '**/idf_component.yml') }}
+          restore-keys: idf-${{ matrix.idf-version }}-${{ matrix.target }}-
+
+      - name: Set target
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py set-target ${{ matrix.target }}
+
+      - name: Build
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py build
+
+      - name: Size report
+        run: |
+          . "$IDF_PATH/export.sh"
+          idf.py size || true
+          idf.py size-components || true
+
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ matrix.target }}-${{ github.sha }}
+          path: |
+            build/*.bin
+            build/*.elf
+            build/bootloader/bootloader.bin
+            build/partition_table/partition-table.bin
+          if-no-files-found: warn
+          retention-days: 14

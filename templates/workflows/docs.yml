@@ -1,0 +1,58 @@
+name: CI (Docs / Specs)
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - '**/*.md'
+      - 'docs/**'
+      - 'spec/**'
+      - 'mkdocs.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - '**/*.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-docs:
+    name: Lint markdown & check links
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Install markdownlint + lychee
+        run: |
+          npm i -g markdownlint-cli2
+          curl -sSL https://github.com/lycheeverse/lychee/releases/latest/download/lychee-x86_64-unknown-linux-gnu.tar.gz | tar -xz
+          sudo mv lychee /usr/local/bin/ || mv lychee "$HOME/.local/bin/"
+
+      - name: Markdownlint
+        run: |
+          markdownlint-cli2 "**/*.md" "#node_modules" "#.venv" || echo "::warning::markdownlint issues"
+        continue-on-error: true
+
+      - name: Link check (lychee)
+        run: |
+          lychee --verbose --no-progress --accept '200,204,301,302,403,429' --exclude-path .venv --exclude-path node_modules '**/*.md' || echo "::warning::broken links"
+        continue-on-error: true
+
+      - name: Build MkDocs (if configured)
+        if: hashFiles('mkdocs.yml') != ''
+        run: |
+          pip install --user mkdocs mkdocs-material
+          "$HOME/.local/bin/mkdocs" build --strict
