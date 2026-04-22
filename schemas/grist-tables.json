@@ -1,0 +1,49 @@
+{
+  "_note": "Source of truth for the Grist doc `f4l-workflow` (doc id in .env, never committed). Apply via `POST /api/docs/{doc}/tables` with `{tables:[...]}` to create; subsequent changes via the Grist UI or targeted API calls. Column types are simplified to Text + Ref/Int/DateTime; choice enumerations are enforced at the f4l-engine application layer.",
+  "tables": [
+    {
+      "id": "intakes",
+      "columns": [
+        {"id": "intake_id", "type": "Text"},
+        {"id": "source", "type": "Text", "_choices": ["grist", "forgejo", "email", "mascarade"]},
+        {"id": "title", "type": "Text"},
+        {"id": "raw_payload", "type": "Text"},
+        {"id": "normalized_payload", "type": "Text"},
+        {"id": "deliverable_type", "type": "Text", "_choices": ["A", "B"]},
+        {"id": "status", "type": "Text", "_choices": ["new", "accepted", "rejected"]},
+        {"id": "created_at", "type": "DateTime:UTC"},
+        {"id": "created_by", "type": "Text"}
+      ]
+    },
+    {
+      "id": "deliverables",
+      "columns": [
+        {"id": "deliverable_id", "type": "Text"},
+        {"id": "slug", "type": "Text"},
+        {"id": "type", "type": "Text", "_choices": ["A", "B"]},
+        {"id": "title", "type": "Text"},
+        {"id": "intake_ref", "type": "Ref:intakes"},
+        {"id": "current_state", "type": "Text", "_choices": ["intake", "spec", "impl", "ship", "ready", "release", "done", "aborted", "blocked-by-fix"]},
+        {"id": "owner", "type": "Text"},
+        {"id": "compliance_profile", "type": "Text", "_choices": ["prototype", "iot_wifi_eu"]},
+        {"id": "parent_deliverable_ref", "type": "Ref:deliverables"},
+        {"id": "created_at", "type": "DateTime:UTC"},
+        {"id": "last_transition_at", "type": "DateTime:UTC"}
+      ]
+    },
+    {
+      "id": "gates",
+      "columns": [
+        {"id": "gate_id", "type": "Text"},
+        {"id": "deliverable_ref", "type": "Ref:deliverables"},
+        {"id": "gate_name", "type": "Text", "_choices": ["G-spec", "G-impl", "G-ship", "G-ready", "G-release"]},
+        {"id": "attempt", "type": "Int"},
+        {"id": "verdict", "type": "Text", "_choices": ["pending", "pass", "fail", "skipped"]},
+        {"id": "reasons", "type": "Text"},
+        {"id": "decided_by", "type": "Text"},
+        {"id": "decided_at", "type": "DateTime:UTC"},
+        {"id": "artifacts_ref", "type": "Text"}
+      ]
+    }
+  ]
+}
