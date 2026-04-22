@@ -5,6 +5,7 @@ import { gristWebhook } from "./webhooks/grist.js";
 import { forgejoWebhook } from "./webhooks/forgejo.js";
 import { gateRoute } from "./routes/gate.js";
 import { deliverablesRoute } from "./routes/deliverables.js";
+import { intakeRoute } from "./routes/intake.js";
 import { registry } from "./metrics.js";
 
 const app = new Hono();
@@ -42,6 +43,7 @@ app.route("/", gristWebhook);
 app.route("/", forgejoWebhook);
 app.route("/", gateRoute);
 app.route("/", deliverablesRoute);
+app.route("/", intakeRoute);
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT ?? 9100);
