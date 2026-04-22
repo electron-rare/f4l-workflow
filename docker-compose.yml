@@ -1,0 +1,25 @@
+services:
+  f4l-engine:
+    build: ./engine
+    container_name: f4l-engine
+    restart: unless-stopped
+    networks: [traefik]
+    environment:
+      PORT: "9100"
+      F4L_WEBHOOK_SECRET: ${F4L_WEBHOOK_SECRET}
+      F4L_BEARER_TOKEN: ${F4L_BEARER_TOKEN}
+      GRIST_API_KEY: ${GRIST_API_KEY}
+      GRIST_DOC_ID: ${GRIST_DOC_ID}
+      FORGEJO_TOKEN: ${FORGEJO_TOKEN}
+      LIFE_CORE_URL: ${LIFE_CORE_URL:-http://life-core:8000}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik"
+      - "traefik.http.routers.f4l-engine.rule=Host(`engine.saillant.cc`)"
+      - "traefik.http.routers.f4l-engine.entrypoints=websecure"
+      - "traefik.http.routers.f4l-engine.tls.certresolver=letsencrypt"
+      - "traefik.http.services.f4l-engine.loadbalancer.server.port=9100"
+
+networks:
+  traefik:
+    external: true
