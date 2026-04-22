@@ -10,5 +10,6 @@
     "declaration": false,
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src/**/*", "test/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["test/**/*", "dist", "node_modules"]
 }

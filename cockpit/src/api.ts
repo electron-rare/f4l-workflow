@@ -4,6 +4,11 @@ const BASE =
 
 const token = (): string => localStorage.getItem("f4l_token") ?? "";
 
+const authHeader = (): Record<string, string> => {
+  const t = token();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
+
 export interface Deliverable {
   deliverable_id: string;
   slug: string;
@@ -26,9 +31,7 @@ export interface Gate {
 }
 
 export async function listDeliverables(): Promise<Deliverable[]> {
-  const r = await fetch(`${BASE}/deliverables`, {
-    headers: { Authorization: `Bearer ${token()}` },
-  });
+  const r = await fetch(`${BASE}/deliverables`, { headers: authHeader() });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
 }
@@ -38,7 +41,7 @@ export async function getDeliverable(slug: string): Promise<{
   gates: Gate[];
 }> {
   const r = await fetch(`${BASE}/deliverables/${slug}`, {
-    headers: { Authorization: `Bearer ${token()}` },
+    headers: authHeader(),
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();

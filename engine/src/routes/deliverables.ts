@@ -24,18 +24,7 @@ async function gristGetAll(path: string): Promise<any> {
   return res.json();
 }
 
-function requireAuth(c: any): Response | null {
-  const auth = c.req.header("authorization");
-  const expected = process.env.F4L_BEARER_TOKEN;
-  if (!expected || auth !== `Bearer ${expected}`) {
-    return c.json({ error: "unauthorized" }, 401);
-  }
-  return null;
-}
-
 deliverablesRoute.get("/deliverables", async (c) => {
-  const denied = requireAuth(c);
-  if (denied) return denied;
   try {
     const data = await gristGetAll("/tables/Deliverables/records");
     const rows = (data.records ?? []).map((r: any) => ({
@@ -49,8 +38,6 @@ deliverablesRoute.get("/deliverables", async (c) => {
 });
 
 deliverablesRoute.get("/deliverables/:slug", async (c) => {
-  const denied = requireAuth(c);
-  if (denied) return denied;
   const slug = c.req.param("slug");
   try {
     const allDeliverables = await gristGetAll(
