@@ -15,14 +15,21 @@ jobs:
   build-evidence:
     runs-on: self-hosted
     steps:
-      - name: Stage demo artifacts
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ secrets.FORGEJO_PUSH_TOKEN }}
+
+      - name: Build evidence set
         run: |
           set -eux
-          out="evidence"
-          mkdir -p "$out"
           slug="${{ inputs.deliverable_id }}"
           profile="${{ inputs.compliance_profile }}"
           ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          out="/tmp/evidence"
+          rm -rf "$out" && mkdir -p "$out"
 
           cat > "$out/01_spec.md" <<MD
           # Deliverable $slug
@@ -38,7 +45,6 @@ jobs:
           MD
 
           printf '%s' '{"erc_version":"1.0","errors":[],"warnings":[{"code":"w101","severity":"warn","message":"Unconnected pin U3.NRST","net":"NRST"},{"code":"w202","severity":"warn","message":"Power input not flagged","net":"+3V3"}],"total":2}' > "$out/erc.json"
-
           printf '%s' '{"drc_version":"1.0","errors":0,"warnings":0,"notes":["Clearance 0.2mm OK","Silkscreen OK"]}' > "$out/drc.json"
 
           cat > "$out/bom.csv" <<CSV
@@ -55,17 +61,25 @@ jobs:
 
           cat > "$out/README.md" <<MD
           # Evidence pack for $slug
-
-          Artifacts: \`01_spec.md\`, \`erc.json\`, \`drc.json\`, \`bom.csv\`, \`firmware.bin\`.
-          Compliance profile: **$profile**.
+          Compliance profile: **$profile**. Generated: $ts.
           MD
 
           ls -la "$out"
 
-      - name: Upload evidence artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: evidence-${{ inputs.deliverable_id }}
-          path: evidence/
-          if-no-files-found: error
-          retention-days: 90
+      - name: Publish to artifacts branch
+        env:
+          SLUG: ${{ inputs.deliverable_id }}
+          TOKEN: ${{ secrets.FORGEJO_PUSH_TOKEN }}
+        run: |
+          set -eux
+          git config --global user.email "evidence-bot@saillant.cc"
+          git config --global user.name "f4l-evidence-bot"
+          BR="artifacts/$SLUG"
+          git checkout --orphan "$BR"
+          git rm -rf --cached . || true
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -r /tmp/evidence/. .
+          git add -A
+          git commit -m "evidence: $SLUG at $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          git push -f "https://token:$TOKEN@git.saillant.cc/factory-4-life/f4l-workflow.git" "$BR"
+          echo "pushed to branch $BR"
