@@ -1,0 +1,85 @@
+name: Evidence Pack (type A)
+
+on:
+  workflow_dispatch:
+    inputs:
+      deliverable_id:
+        description: "F4L deliverable ID (slug)"
+        required: true
+        type: string
+      compliance_profile:
+        description: "prototype | iot_wifi_eu"
+        required: true
+        default: "prototype"
+        type: choice
+        options: [prototype, iot_wifi_eu]
+
+concurrency:
+  group: evidence-${{ inputs.deliverable_id }}
+  cancel-in-progress: false
+
+jobs:
+  build-evidence:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout monorepo
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Resolve deliverable spec path
+        id: spec
+        run: |
+          slug="${{ inputs.deliverable_id }}"
+          spec="specs/${slug}/01_spec.md"
+          if [ ! -f "$spec" ]; then
+            echo "::error::Spec not found at $spec"
+            exit 1
+          fi
+          echo "spec_path=$spec" >> "$GITHUB_OUTPUT"
+
+      - name: Run ERC / DRC (if KiCad project present)
+        run: |
+          slug="${{ inputs.deliverable_id }}"
+          kicad_pro=$(find "artifacts/$slug" -name "*.kicad_pro" | head -1 || true)
+          if [ -n "$kicad_pro" ]; then
+            kicad-cli sch erc "$kicad_pro" --output "artifacts/$slug/erc.json"
+            kicad-cli pcb drc "$kicad_pro" --output "artifacts/$slug/drc.json"
+          fi
+
+      - name: Run firmware build (if present)
+        run: |
+          slug="${{ inputs.deliverable_id }}"
+          fw="makelife-firmware/projects/$slug"
+          if [ -d "$fw" ]; then
+            cmake --preset esp32 -S "$fw" -B "$fw/build"
+            cmake --build "$fw/build"
+          fi
+
+      - name: Collect BOM / netlist / reports
+        run: |
+          slug="${{ inputs.deliverable_id }}"
+          out="artifacts/$slug/evidence-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$out"
+          cp -r "specs/$slug" "$out/specs" || true
+          [ -f "artifacts/$slug/erc.json" ] && cp "artifacts/$slug/erc.json" "$out/" || true
+          [ -f "artifacts/$slug/drc.json" ] && cp "artifacts/$slug/drc.json" "$out/" || true
+          (cd "artifacts/$slug" && zip -r "evidence-latest.zip" "$(basename "$out")")
+          echo "EVIDENCE_ZIP=artifacts/$slug/evidence-latest.zip" >> "$GITHUB_ENV"
+
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-${{ inputs.deliverable_id }}
+          path: ${{ env.EVIDENCE_ZIP }}
+          retention-days: 90
+
+      - name: Notify f4l-engine
+        run: |
+          curl -sf -X POST \
+            -H "Content-Type: application/json" \
+            -H "X-Forgejo-Signature: ${{ secrets.F4L_WEBHOOK_SECRET }}" \
+            -d "{\"deliverable_id\":\"${{ inputs.deliverable_id }}\",\"run_id\":\"${{ github.run_id }}\",\"status\":\"success\"}" \
+            "https://engine.saillant.cc/webhooks/forgejo"
+
