@@ -11,10 +11,13 @@
     "test:watch": "vitest",
     "lint": "tsc --noEmit"
   },
-  "engines": { "node": ">=22.0.0" },
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "dependencies": {
     "@hono/node-server": "^1.16.0",
     "hono": "^4.10.0",
+    "jszip": "^3.10.1",
     "pino": "^9.5.0",
     "prom-client": "^15.1.0",
     "zod": "^3.24.0"

@@ -6,6 +6,7 @@ import { forgejoWebhook } from "./webhooks/forgejo.js";
 import { gateRoute } from "./routes/gate.js";
 import { deliverablesRoute } from "./routes/deliverables.js";
 import { intakeRoute } from "./routes/intake.js";
+import { artifactsRoute } from "./routes/artifacts.js";
 import { registry } from "./metrics.js";
 
 const app = new Hono();
@@ -44,6 +45,7 @@ app.route("/", forgejoWebhook);
 app.route("/", gateRoute);
 app.route("/", deliverablesRoute);
 app.route("/", intakeRoute);
+app.route("/", artifactsRoute);
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.PORT ?? 9100);
