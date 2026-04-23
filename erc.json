@@ -1,0 +1,1 @@
+{"erc_version":"1.0","errors":[],"warnings":[{"code":"w101","severity":"warn","message":"Unconnected pin U3.NRST","net":"NRST"},{"code":"w202","severity":"warn","message":"Power input not flagged","net":"+3V3"}],"total":2}
