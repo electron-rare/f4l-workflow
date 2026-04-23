@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "wouter";
-import { listDeliverables, type Deliverable } from "../api";
+import { byRecentFirst, formatGristDate, listDeliverables, type Deliverable } from "../api";
 import IntakeForm from "../components/IntakeForm";
 
 const POLL_MS = 10_000;
@@ -13,9 +13,7 @@ export default function DeliverablesList() {
     try {
       const d = await listDeliverables();
       setItems(
-        d.sort((a, b) =>
-          (b.last_transition_at ?? "").localeCompare(a.last_transition_at ?? "")
-        )
+        d.sort((a, b) => byRecentFirst(a.last_transition_at, b.last_transition_at))
       );
       setErr(null);
     } catch (e) {
@@ -77,11 +75,7 @@ export default function DeliverablesList() {
                   <td>
                     <span className="muted">{it.compliance_profile}</span>
                   </td>
-                  <td className="muted">
-                    {it.last_transition_at
-                      ? new Date(it.last_transition_at).toLocaleString()
-                      : "—"}
-                  </td>
+                  <td className="muted">{formatGristDate(it.last_transition_at)}</td>
                 </tr>
               ))}
             </tbody>

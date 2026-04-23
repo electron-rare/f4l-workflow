@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "wouter";
 import {
   advanceGate,
+  byRecentFirst,
+  formatGristDate,
   getDeliverable,
   getToken,
   type Deliverable,
@@ -24,11 +26,7 @@ export default function DeliverableDetail() {
     try {
       const d = await getDeliverable(slug);
       setDeliverable(d.deliverable);
-      setGates(
-        d.gates.sort((a, b) =>
-          (b.decided_at ?? "").localeCompare(a.decided_at ?? "")
-        )
-      );
+      setGates(d.gates.sort((a, b) => byRecentFirst(a.decided_at, b.decided_at)));
       setErr(null);
     } catch (e) {
       setErr((e as Error).message);
@@ -97,11 +95,7 @@ export default function DeliverableDetail() {
           <dt>Owner</dt>
           <dd>{deliverable.owner || "—"}</dd>
           <dt>Last transition</dt>
-          <dd>
-            {deliverable.last_transition_at
-              ? new Date(deliverable.last_transition_at).toLocaleString()
-              : "—"}
-          </dd>
+          <dd>{formatGristDate(deliverable.last_transition_at)}</dd>
         </dl>
       </section>
 
@@ -156,11 +150,7 @@ export default function DeliverableDetail() {
                 </div>
                 <div className="muted">{g.decided_by ?? "—"}</div>
                 <div className="muted">{g.reasons || "—"}</div>
-                <div className="muted">
-                  {g.decided_at
-                    ? new Date(g.decided_at).toLocaleString()
-                    : "—"}
-                </div>
+                <div className="muted">{formatGristDate(g.decided_at)}</div>
               </div>
             ))}
           </div>

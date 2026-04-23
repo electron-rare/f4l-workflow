@@ -22,8 +22,8 @@ export interface Deliverable {
   current_state: string;
   compliance_profile: string;
   owner: string;
-  last_transition_at?: string;
-  created_at?: string;
+  last_transition_at?: number | null;
+  created_at?: number | null;
 }
 
 export interface Gate {
@@ -34,9 +34,17 @@ export interface Gate {
   verdict: string;
   reasons?: string;
   decided_by?: string;
-  decided_at?: string;
+  decided_at?: number | null;
   attempt?: number;
 }
+
+export const formatGristDate = (v: number | null | undefined): string =>
+  v ? new Date(v * 1000).toLocaleString() : "—";
+
+export const byRecentFirst = (
+  a: number | null | undefined,
+  b: number | null | undefined
+): number => (b ?? 0) - (a ?? 0);
 
 export async function listDeliverables(): Promise<Deliverable[]> {
   const r = await fetch(`${BASE}/deliverables`, { headers: authHeader() });
