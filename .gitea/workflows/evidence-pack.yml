@@ -63,7 +63,7 @@ jobs:
           ls -la "$out"
 
       - name: Upload evidence artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: evidence-${{ inputs.deliverable_id }}
           path: evidence/
