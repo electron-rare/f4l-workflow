@@ -1,0 +1,18 @@
+name: E2E-4 Compliance fork (type A)
+on: workflow_dispatch
+
+# Scenario: qa agent returns verdict=fail with category=compliance.
+# Engine should create a child deliverable `fix-<slug>-01` and move the
+# parent to `blocked-by-fix`. This test relies on life-core's qa agent
+# being in "force compliance fail" mode via F4L_TEST_FORCE_COMPLIANCE_FAIL=1.
+
+jobs:
+  e2e-compliance:
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - name: Placeholder — implemented once fork logic lands
+        run: |
+          echo "Compliance fork scenario requires life-core qa agent flag support"
+          echo "and engine-side fork-on-category='compliance' branch."
+          echo "Deferred beyond MVP walking-skeleton; contract captured in plan."

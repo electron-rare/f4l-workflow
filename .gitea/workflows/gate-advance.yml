@@ -1,0 +1,36 @@
+name: Gate advance
+
+on:
+  workflow_dispatch:
+    inputs:
+      deliverable_id:
+        required: true
+        type: string
+      gate_name:
+        required: true
+        type: choice
+        options: [G-spec, G-impl, G-ship, G-ready, G-release]
+      verdict:
+        required: true
+        type: choice
+        options: [pass, fail, skipped]
+      reasons:
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  write-gate:
+    runs-on: self-hosted
+    steps:
+      - name: Write gate record to Grist
+        env:
+          GRIST_KEY: ${{ secrets.GRIST_API_KEY }}
+          GRIST_DOC: ${{ secrets.GRIST_DOC_ID }}
+        run: |
+          GATE_ID="gate-${{ inputs.deliverable_id }}-${{ inputs.gate_name }}-$(date -u +%s)"
+          curl -sf -X POST \
+            -H "Authorization: Bearer $GRIST_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{\"records\":[{\"fields\":{\"gate_id\":\"$GATE_ID\",\"gate_name\":\"${{ inputs.gate_name }}\",\"verdict\":\"${{ inputs.verdict }}\",\"reasons\":\"${{ inputs.reasons }}\",\"decided_by\":\"forgejo\",\"decided_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}}]}" \
+            "https://grist.saillant.cc/api/docs/$GRIST_DOC/tables/Gates/records"
