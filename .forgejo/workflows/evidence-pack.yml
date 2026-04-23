@@ -82,3 +82,4 @@ jobs:
             -H "X-Forgejo-Signature: ${{ secrets.F4L_WEBHOOK_SECRET }}" \
             -d "{\"deliverable_id\":\"${{ inputs.deliverable_id }}\",\"run_id\":\"${{ github.run_id }}\",\"status\":\"success\"}" \
             "https://engine.saillant.cc/webhooks/forgejo"
+
