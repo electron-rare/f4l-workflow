@@ -8,11 +8,13 @@ export interface AgentResult {
   reasons: string[];
 }
 
+export type AgentRole = "spec" | "impl" | "qa";
+
 export class LifeCoreClient {
   constructor(private cfg: LifeCoreConfig) {}
 
   async runAgent(
-    role: "spec" | "qa",
+    role: AgentRole,
     payload: Record<string, any>
   ): Promise<{ job_id: string; result: AgentResult }> {
     const url = `${this.cfg.baseUrl}/agents/${role}/run`;

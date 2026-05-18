@@ -2,6 +2,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { transition, type DeliverableState } from "../state-machine.js";
 import { GristClient } from "../grist-client.js";
+import { LifeCoreClient } from "../life-core-client.js";
+import { maybeDispatchOnEnterImpl } from "../handlers/transition-impl.js";
 import { counters } from "../metrics.js";
 
 const AdvanceSchema = z.object({
@@ -18,6 +20,12 @@ function grist(): GristClient | null {
   const docId = process.env.GRIST_DOC_ID ?? "";
   if (!apiKey || !docId) return null;
   return new GristClient({ baseUrl, apiKey, docId });
+}
+
+function lifeCore(): LifeCoreClient | null {
+  const baseUrl = process.env.LIFE_CORE_URL ?? "";
+  if (!baseUrl) return null;
+  return new LifeCoreClient({ baseUrl });
 }
 
 async function findDeliverableBySlug(
@@ -103,6 +111,29 @@ gateRoute.post("/gate/advance", async (c) => {
     }
   }
   counters.gateTransitions.inc({ gate, verdict });
+
+  // Dispatch impl agent on entry into `impl` outer state (Sprint 1 HITL
+  // pipeline). Errors are logged but do not fail the gate advance.
+  const lc = lifeCore();
+  if (lc && next !== state) {
+    try {
+      const implVerdict = await maybeDispatchOnEnterImpl(state, next, lc, {
+        slug: deliverable_id,
+        type: (match.fields.type as string) ?? "",
+        compliance_profile:
+          (match.fields.compliance_profile as string) ?? "prototype",
+      });
+      if (implVerdict !== null) {
+        counters.agentInvocations.inc({
+          role: "impl",
+          status: implVerdict === "GateImplPass" ? "pass" : "fail",
+        });
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("impl agent dispatch failed:", (e as Error).message);
+    }
+  }
 
   return c.json({
     ok: true,
