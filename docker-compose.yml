@@ -16,6 +16,7 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik"
       - "traefik.http.routers.f4l-engine.rule=Host(`engine.saillant.cc`)"
+      - "traefik.http.routers.f4l-engine.middlewares=engine-strip-fwduser@file"
       - "traefik.http.routers.f4l-engine.entrypoints=websecure"
       - "traefik.http.routers.f4l-engine.tls.certresolver=letsencrypt"
       - "traefik.http.services.f4l-engine.loadbalancer.server.port=9100"
