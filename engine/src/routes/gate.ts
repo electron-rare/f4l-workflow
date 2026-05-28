@@ -5,6 +5,7 @@ import { GristClient } from "../grist-client.js";
 import { LifeCoreClient } from "../life-core-client.js";
 import { maybeDispatchOnEnterImpl } from "../handlers/transition-impl.js";
 import { counters } from "../metrics.js";
+import { writeActor } from "../middleware/require-write.js";
 
 const AdvanceSchema = z.object({
   deliverable_id: z.string(),
@@ -63,9 +64,8 @@ function eventForGate(
 export const gateRoute = new Hono();
 
 gateRoute.post("/gate/advance", async (c) => {
-  const auth = c.req.header("authorization");
-  const expected = process.env.F4L_BEARER_TOKEN;
-  if (!expected || auth !== `Bearer ${expected}`) {
+  const actor = writeActor(c);
+  if (!actor) {
     return c.json({ error: "unauthorized" }, 401);
   }
   const parsed = AdvanceSchema.safeParse(await c.req.json());
@@ -92,7 +92,7 @@ gateRoute.post("/gate/advance", async (c) => {
       gate_name: gate,
       verdict,
       reasons: reasons ?? "",
-      decided_by: "cli",
+      decided_by: actor,
       decided_at: new Date().toISOString(),
       attempt: 1,
     });

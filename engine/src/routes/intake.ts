@@ -4,6 +4,7 @@ import { normalizeIntake } from "../intake-normalizer.js";
 import { GristClient } from "../grist-client.js";
 import { transition } from "../state-machine.js";
 import { counters } from "../metrics.js";
+import { writeActor } from "../middleware/require-write.js";
 
 const IntakeSchema = z.object({
   title: z.string().min(1),
@@ -26,9 +27,8 @@ function grist(): GristClient | null {
 export const intakeRoute = new Hono();
 
 intakeRoute.post("/api/intake", async (c) => {
-  const auth = c.req.header("authorization");
-  const expected = process.env.F4L_BEARER_TOKEN;
-  if (!expected || auth !== `Bearer ${expected}`) {
+  const actor = writeActor(c);
+  if (!actor) {
     return c.json({ error: "unauthorized" }, 401);
   }
   const parsed = IntakeSchema.safeParse(await c.req.json());
@@ -57,7 +57,7 @@ intakeRoute.post("/api/intake", async (c) => {
         deliverable_type,
         status: "accepted",
         created_at: intake.created_at,
-        created_by: "cockpit",
+        created_by: actor,
       });
       slug = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40)}-${Date.now()}`;
       const r = await g.createDeliverable({
@@ -66,7 +66,7 @@ intakeRoute.post("/api/intake", async (c) => {
         type: deliverable_type,
         title,
         current_state: "intake",
-        owner: "cockpit",
+        owner: actor,
         compliance_profile,
         created_at: intake.created_at,
         last_transition_at: intake.created_at,

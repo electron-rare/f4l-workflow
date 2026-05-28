@@ -61,6 +61,33 @@ describe("POST /gate/advance", () => {
   });
 });
 
+describe("gate auth via forward-auth", () => {
+  it("rejects with neither bearer nor forwarded-user", async () => {
+    const res = await app.fetch(
+      new Request("http://x/gate/advance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deliverable_id: "x", gate: "G-spec", verdict: "pass" }),
+      }),
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("accepts X-Forwarded-User and passes auth (then fails later on grist, not 401)", async () => {
+    const res = await app.fetch(
+      new Request("http://x/gate/advance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Forwarded-User": "clement",
+        },
+        body: JSON.stringify({ deliverable_id: "x", gate: "G-spec", verdict: "pass" }),
+      }),
+    );
+    expect(res.status).not.toBe(401);
+  });
+});
+
 describe("GET /health and /metrics", () => {
   it("/health returns ok", async () => {
     const r = await app.request("/health");
